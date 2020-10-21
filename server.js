@@ -8,11 +8,19 @@ import passportGithub from 'passport-github';
 import session from 'express-session';
 import path from 'path';
 import express from 'express';
+import passportGoogle from 'passport-google-oauth2';
+import passportFacebook from "passport-facebook"
+const fetch = require("node-fetch");
+
+require("babel-core/register");
+require("babel-polyfill");
 
 const LOCAL_PORT = 8081;
-const DEPLOY_URL = "http://codech18eb-env.eba-a4ypmhpi.us-east-2.elasticbeanstalk.com";
+const DEPLOY_URL = "http://localhost:8081";
 const PORT = process.env.HTTP_PORT || LOCAL_PORT;
 const GithubStrategy = passportGithub.Strategy;
+var GoogleStrategy = passportGoogle.Strategy;
+const FacebookStrategy = passportFacebook.Strategy;
 const app = express();
 
 //////////////////////////////////////////////////////////////////////////
@@ -21,8 +29,8 @@ const app = express();
 //the 'github' strategy in passport.js.
 //////////////////////////////////////////////////////////////////////////
 passport.use(new GithubStrategy({
-    clientID: "a075012c4b08543f42a8",
-    clientSecret: "8dde6978090028aee37c72df9ea7ce268678b6d3",
+    clientID: "1d90e0594c090c4a6a8b",
+    clientSecret: "97b239b3bc79632dfd4f9d197628cfac487d2086",
     callbackURL: DEPLOY_URL + "/auth/github/callback"
   },
   (accessToken, refreshToken, profile, done) => {
@@ -31,17 +39,59 @@ passport.use(new GithubStrategy({
   }
 ));
 
-passport.serializeUser((user, done) => {
+passport.use(new GoogleStrategy({
+    clientID:     "598098886706-kg4sluu9s43lfevv9hbllmafeue7vrai.apps.googleusercontent.com",
+    clientSecret: "-AaR07Yg6G-W3pfT24jgkmIf",
+    callbackURL: DEPLOY_URL + "/auth/google/callback"
+  },
+  (accessToken, refreshToken, profile, done) => {
+    // TO DO: If user in profile object isn’t yet in our database, add the user here
+    return done(null, profile);
+  }
+));
+
+passport.use(new FacebookStrategy({
+    clientID: "989435561793077",
+    clientSecret: "ed9eaba2ea52aac20a3656f4affd5788",
+    callbackURL: DEPLOY_URL + "/auth/facebook/callback"
+  },
+  (accessToken, refreshToken, profile, done) => {
+    // TO DO: If user in profile object isn’t yet in our database, add the user here
+    return done(null, profile);
+  }
+));
+
+passport.serializeUser( async (user, done) => {
     console.log("In serializeUser.");
+    console.log(JSON.stringify(user));
     //Note: The code does not use a back-end database. When we have back-end 
     //database, we would put user info into the database in the callback 
     //above and only serialize the unique user id into the session
-    let userObject = {
-      id: user.username + "@github",
-      username : user.username,
-      provider : user.provider,
-      profileImageUrl : user.photos[0].value
-    };
+
+    let userObject = undefined;
+    if(user.provider == "facebook"){
+        let fbAPIreq = await fetch("https://graph.facebook.com/" +  user.id + "/picture")
+        console.log("IN FACEBOOK USEROBJECT DEF")
+        console.log(fbAPIreq.url)
+       userObject = {
+        id: user.displayName + "@" + user.provider,
+        displayName : user.displayName,
+        provider : user.provider,
+        profileImageUrl : fbAPIreq.url
+      };
+    }
+    else{
+       userObject = {
+        id: user.displayName + "@" + user.provider,
+        displayName : user.displayName,
+        provider : user.provider,
+        profileImageUrl : user.photos[0].value
+      };
+    }
+
+    console.log(JSON.stringify(userObject))
+
+
     done(null, userObject);
   });
   
@@ -87,6 +137,32 @@ app.get('/auth/github', passport.authenticate('github'));
 app.get('/auth/github/callback', passport.authenticate('github', { failureRedirect: '/' }),
   (req, res) => {
     console.log("auth/github/callback reached.")
+    res.redirect('/'); //sends user back to login screen; 
+                       //req.isAuthenticated() indicates status
+  }
+);
+
+//AUTHENTICATE route: Uses passport to authenticate with GitHub.
+//Should be accessed when user clicks on 'Login with GitHub' button on 
+//Log In page.
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile'] }));
+
+//CALLBACK route:  GitHub will call this route after the
+//OAuth authentication process is complete.
+//req.isAuthenticated() tells us whether authentication was successful.
+app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    console.log("auth/google/callback reached.")
+    res.redirect('/'); //sends user back to login screen; 
+                       //req.isAuthenticated() indicates status
+  }
+);
+
+app.get('/auth/facebook', passport.authenticate('facebook'));
+
+app.get('/auth/facebook/callback', passport.authenticate('facebook', { failureRedirect: '/' }),
+  (req, res) => {
+    console.log("auth/facebook/callback reached.")
     res.redirect('/'); //sends user back to login screen; 
                        //req.isAuthenticated() indicates status
   }

@@ -16,7 +16,11 @@ constructor() {
                   showCreateAccountDialog: false,
                   showResetPasswordDialog: false,
                   githubIcon: "fa fa-github",
-                  githubLabel: "Sign in with GitHub"
+                  githubLabel: "Sign in with GitHub",
+                  googleIcon: "fa fa-google",
+                  googleLabel: "Sign in with Google",
+                  facebookIcon: "fa fa-facebook",
+                  facebookLabel: "Sign in with Facebook"
                   };
 } 
     
@@ -147,6 +151,16 @@ handleOAuthLoginClick = (provider) => {
                onClick={() => this.handleOAuthLoginClick("github")}>
               <span className={this.state.githubIcon}></span>&nbsp;
                 {this.state.githubLabel}
+            </button>
+            <button type="button" className="btn btn-google" id="mybuttonineed"
+               onClick={() => this.handleOAuthLoginClick("google")}>
+              <span className={this.state.googleIcon}></span>&nbsp;
+                {this.state.googleLabel}
+            </button>
+            <button type="button" className="btn btn-facebook" id="mybuttonineed"
+               onClick={() => this.handleOAuthLoginClick("facebook")}>
+              <span className={this.state.facebookIcon}></span>&nbsp;
+                {this.state.facebookLabel}
             </button>
             <p>
                 <i>Version CptS 489</i>

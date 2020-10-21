@@ -10,17 +10,28 @@ var _path = _interopRequireDefault(require("path"));
 
 var _express = _interopRequireDefault(require("express"));
 
+var _passportGoogleOauth = _interopRequireDefault(require("passport-google-oauth2"));
+
+var _passportFacebook = _interopRequireDefault(require("passport-facebook"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
-//////////////////////////////////////////////////////////////////////////
-//IMPORTS AND VARIABLE INITIALIZATIONS
-//The following code imports necessary dependencies and initializes
-//variables used in the server middleware.
-//////////////////////////////////////////////////////////////////////////
+function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
+
+function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
+
+var fetch = require("node-fetch");
+
+require("babel-core/register");
+
+require("babel-polyfill");
+
 var LOCAL_PORT = 8081;
-var DEPLOY_URL = "http://codech18eb-env.eba-a4ypmhpi.us-east-2.elasticbeanstalk.com";
+var DEPLOY_URL = "http://localhost:8081";
 var PORT = process.env.HTTP_PORT || LOCAL_PORT;
 var GithubStrategy = _passportGithub["default"].Strategy;
+var GoogleStrategy = _passportGoogleOauth["default"].Strategy;
+var FacebookStrategy = _passportFacebook["default"].Strategy;
 var app = (0, _express["default"])(); //////////////////////////////////////////////////////////////////////////
 //PASSPORT SET-UP
 //The following code sets up the app with OAuth authentication using
@@ -28,27 +39,91 @@ var app = (0, _express["default"])(); //////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
 _passport["default"].use(new GithubStrategy({
-  clientID: "a075012c4b08543f42a8",
-  clientSecret: "8dde6978090028aee37c72df9ea7ce268678b6d3",
+  clientID: "1d90e0594c090c4a6a8b",
+  clientSecret: "97b239b3bc79632dfd4f9d197628cfac487d2086",
   callbackURL: DEPLOY_URL + "/auth/github/callback"
 }, function (accessToken, refreshToken, profile, done) {
   // TO DO: If user in profile object isn’t yet in our database, add the user here
   return done(null, profile);
 }));
 
-_passport["default"].serializeUser(function (user, done) {
-  console.log("In serializeUser."); //Note: The code does not use a back-end database. When we have back-end 
-  //database, we would put user info into the database in the callback 
-  //above and only serialize the unique user id into the session
+_passport["default"].use(new GoogleStrategy({
+  clientID: "598098886706-kg4sluu9s43lfevv9hbllmafeue7vrai.apps.googleusercontent.com",
+  clientSecret: "-AaR07Yg6G-W3pfT24jgkmIf",
+  callbackURL: DEPLOY_URL + "/auth/google/callback"
+}, function (accessToken, refreshToken, profile, done) {
+  // TO DO: If user in profile object isn’t yet in our database, add the user here
+  return done(null, profile);
+}));
 
-  var userObject = {
-    id: user.username + "@github",
-    username: user.username,
-    provider: user.provider,
-    profileImageUrl: user.photos[0].value
+_passport["default"].use(new FacebookStrategy({
+  clientID: "989435561793077",
+  clientSecret: "ed9eaba2ea52aac20a3656f4affd5788",
+  callbackURL: DEPLOY_URL + "/auth/facebook/callback"
+}, function (accessToken, refreshToken, profile, done) {
+  // TO DO: If user in profile object isn’t yet in our database, add the user here
+  return done(null, profile);
+}));
+
+_passport["default"].serializeUser( /*#__PURE__*/function () {
+  var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(user, done) {
+    var userObject, fbAPIreq;
+    return regeneratorRuntime.wrap(function _callee$(_context) {
+      while (1) {
+        switch (_context.prev = _context.next) {
+          case 0:
+            console.log("In serializeUser.");
+            console.log(JSON.stringify(user)); //Note: The code does not use a back-end database. When we have back-end 
+            //database, we would put user info into the database in the callback 
+            //above and only serialize the unique user id into the session
+
+            userObject = undefined;
+
+            if (!(user.provider == "facebook")) {
+              _context.next = 12;
+              break;
+            }
+
+            _context.next = 6;
+            return fetch("https://graph.facebook.com/" + user.id + "/picture");
+
+          case 6:
+            fbAPIreq = _context.sent;
+            console.log("IN FACEBOOK USEROBJECT DEF");
+            console.log(fbAPIreq.url);
+            userObject = {
+              id: user.displayName + "@" + user.provider,
+              displayName: user.displayName,
+              provider: user.provider,
+              profileImageUrl: fbAPIreq.url
+            };
+            _context.next = 13;
+            break;
+
+          case 12:
+            userObject = {
+              id: user.displayName + "@" + user.provider,
+              displayName: user.displayName,
+              provider: user.provider,
+              profileImageUrl: user.photos[0].value
+            };
+
+          case 13:
+            console.log(JSON.stringify(userObject));
+            done(null, userObject);
+
+          case 15:
+          case "end":
+            return _context.stop();
+        }
+      }
+    }, _callee);
+  }));
+
+  return function (_x, _x2) {
+    return _ref.apply(this, arguments);
   };
-  done(null, userObject);
-}); //Deserialize the current user from the session
+}()); //Deserialize the current user from the session
 //to persistent storage.
 
 
@@ -90,6 +165,30 @@ app.get('/auth/github/callback', _passport["default"].authenticate('github', {
   failureRedirect: '/'
 }), function (req, res) {
   console.log("auth/github/callback reached.");
+  res.redirect('/'); //sends user back to login screen; 
+  //req.isAuthenticated() indicates status
+}); //AUTHENTICATE route: Uses passport to authenticate with GitHub.
+//Should be accessed when user clicks on 'Login with GitHub' button on 
+//Log In page.
+
+app.get('/auth/google', _passport["default"].authenticate('google', {
+  scope: ['profile']
+})); //CALLBACK route:  GitHub will call this route after the
+//OAuth authentication process is complete.
+//req.isAuthenticated() tells us whether authentication was successful.
+
+app.get('/auth/google/callback', _passport["default"].authenticate('google', {
+  failureRedirect: '/'
+}), function (req, res) {
+  console.log("auth/google/callback reached.");
+  res.redirect('/'); //sends user back to login screen; 
+  //req.isAuthenticated() indicates status
+});
+app.get('/auth/facebook', _passport["default"].authenticate('facebook'));
+app.get('/auth/facebook/callback', _passport["default"].authenticate('facebook', {
+  failureRedirect: '/'
+}), function (req, res) {
+  console.log("auth/facebook/callback reached.");
   res.redirect('/'); //sends user back to login screen; 
   //req.isAuthenticated() indicates status
 }); //LOGOUT route: Use passport's req.logout() method to log the user out and
